@@ -10,10 +10,6 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
     </style>
-    <script>
-        // Critical: Shim process for browser environment to prevent ReferenceErrors
-        window.process = window.process || { env: {} };
-    </script>
 <script type="importmap">
 {
   "imports": {
@@ -29,6 +25,5 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
