@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { 
   BarChart3, TrendingUp, Clock, Database, Filter, Package, Truck, 
   Download, BrainCircuit, AlertCircle, Trash2, CheckCircle2, 
@@ -1054,6 +1055,7 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
+      <SpeedInsights />
     </div>
   );
 };
