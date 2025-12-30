@@ -50,6 +50,10 @@ const App: React.FC = () => {
 
   const activeData = isCleansed ? cleansedData : data;
 
+  const totalUploadedPoints = useMemo(() => {
+    return uploadedForecasts.reduce((acc, f) => acc + f.forecast.length, 0);
+  }, [uploadedForecasts]);
+
   // --- DYNAMIC FILTER LOGIC ---
   const availableParts = useMemo(() => {
     let filtered = activeData;
@@ -451,7 +455,7 @@ const App: React.FC = () => {
   const baselinePreviewData = useMemo(() => {
     if (!activeBaseline) return [];
     // Show last 3 historical + first 3 forecast
-    const history = filteredHistory.slice(-3).map(h => ({ val: h.usdPrice, lt: h.leadTimeDays, type: 'H' }));
+    const history = filteredHistory.slice(-3).map(h => ({ val: h.usdPrice, lt: h.leadTimeDays, type: 'H', high: h.usdPrice, low: h.usdPrice }));
     const future = activeBaseline.forecast.slice(0, 3).map(f => ({ 
       val: f.predictedPrice, 
       lt: f.predictedLeadTime, 
@@ -789,9 +793,9 @@ const App: React.FC = () => {
                           {proposedRates.length > 0 && (
                             <button 
                               onClick={() => setProposedRates([])}
-                              className="text-[10px] font-black text-rose-500 hover:text-rose-700 uppercase tracking-widest transition-colors"
+                              className="text-[10px] font-black text-rose-500 hover:text-rose-700 uppercase tracking-widest transition-colors flex items-center gap-1"
                             >
-                              Clear
+                              <Eraser className="w-3 h-3" /> Clear
                             </button>
                           )}
                         </div>
@@ -852,19 +856,22 @@ const App: React.FC = () => {
                                   <div className="flex flex-col">
                                     <span className="text-[8px] font-bold text-slate-400 uppercase mb-1">Price Trend</span>
                                     <ResponsiveContainer width="100%" height="100%">
-                                      <LineChart data={baselinePreviewData}>
+                                      <ComposedChart data={baselinePreviewData}>
+                                        <XAxis dataKey="type" hide />
+                                        <YAxis hide domain={['auto', 'auto']} />
+                                        <Area type="monotone" dataKey="high" stroke="none" fill="#6366f1" fillOpacity={0.1} isAnimationActive={false} />
                                         <Line type="monotone" dataKey="val" stroke="#6366f1" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                        {/* Confidence Band mockup */}
-                                        <Area type="monotone" dataKey="high" stroke="none" fill="#6366f1" fillOpacity={0.1} />
-                                      </LineChart>
+                                      </ComposedChart>
                                     </ResponsiveContainer>
                                   </div>
                                   <div className="flex flex-col">
                                     <span className="text-[8px] font-bold text-slate-400 uppercase mb-1">Lead Time</span>
                                     <ResponsiveContainer width="100%" height="100%">
-                                      <LineChart data={baselinePreviewData}>
+                                      <ComposedChart data={baselinePreviewData}>
+                                        <XAxis dataKey="type" hide />
+                                        <YAxis hide domain={['auto', 'auto']} />
                                         <Line type="stepAfter" dataKey="lt" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                      </LineChart>
+                                      </ComposedChart>
                                     </ResponsiveContainer>
                                   </div>
                                 </div>
@@ -887,10 +894,27 @@ const App: React.FC = () => {
                               </div>
                             ) : (
                               <div className="space-y-2">
-                                <label className={`cursor-pointer px-6 py-4 rounded-xl font-black text-xs flex items-center justify-center gap-3 transition-all border-2 ${uploadedForecasts.length > 0 ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-slate-50 border-slate-200 hover:border-indigo-300 text-slate-600'}`}>
-                                  <Upload className="w-4 h-4" /> Import Base
-                                  <input type="file" className="hidden" accept=".csv" onChange={handleForecastUpload} />
-                                </label>
+                                <div className="flex items-center gap-2">
+                                  <label className={`flex-1 cursor-pointer px-4 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-3 transition-all border-2 ${uploadedForecasts.length > 0 ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-slate-50 border-slate-200 hover:border-indigo-300 text-slate-600'}`}>
+                                    <Upload className="w-4 h-4" /> {uploadedForecasts.length > 0 ? `${uploadedForecasts.length} SKUs Loaded` : 'Import Base'}
+                                    <input type="file" className="hidden" accept=".csv" onChange={handleForecastUpload} />
+                                  </label>
+                                  {uploadedForecasts.length > 0 && (
+                                    <button 
+                                      onClick={() => setUploadedForecasts([])}
+                                      className="p-3 bg-rose-50 border border-rose-100 text-rose-500 rounded-xl hover:bg-rose-100 transition-all shadow-sm"
+                                      title="Clear Uploaded Baselines"
+                                    >
+                                      <Eraser className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                                {uploadedForecasts.length > 0 && (
+                                  <div className="px-2 flex justify-between items-center text-[9px] font-black text-violet-400 uppercase tracking-widest">
+                                    <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> Total Points: {totalUploadedPoints}</span>
+                                    <CheckCircle className="w-3 h-3" />
+                                  </div>
+                                )}
                                 <button onClick={downloadForecastTemplate} className="text-slate-400 text-[9px] font-bold hover:text-indigo-600 transition-all w-full text-center">
                                   Download Baseline CSV Format
                                 </button>
