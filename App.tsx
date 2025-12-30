@@ -5,7 +5,7 @@ import {
   Download, BrainCircuit, AlertCircle, Trash2, CheckCircle2, 
   BarChart, History, Scale, Upload, Zap, Layers, RefreshCw, FileDown,
   Table, XCircle, FileSpreadsheet, Settings2, AlertTriangle, CheckCircle, Info, Eraser, Files, Sparkles, Mail, Send, Copy, ClipboardCheck,
-  ChevronRight, Cpu, Activity
+  ChevronRight, Cpu, Activity, ShieldCheck, Key
 } from 'lucide-react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Bar, ComposedChart, Line, LineChart
@@ -25,6 +25,9 @@ const App: React.FC = () => {
   const [cleansedData, setCleansedData] = useState<HistoricalData[]>([]);
   const [outlierCount, setOutlierCount] = useState(0);
   const [isCleansed, setIsCleansed] = useState(false);
+  
+  // Auth state
+  const [isAiConnected, setIsAiConnected] = useState(false);
   
   // Tab 1 state
   const [selectedModel, setSelectedModel] = useState<ModelType>('gemini-3-flash-preview');
@@ -49,6 +52,25 @@ const App: React.FC = () => {
   const [emailModeStatus, setEmailModeStatus] = useState<string | null>(null);
 
   const activeData = isCleansed ? cleansedData : data;
+
+  // Check for API Key Connection
+  useEffect(() => {
+    const checkConnection = async () => {
+      // Check if process.env.API_KEY exists OR if user has selected a key in studio
+      const hasEnvKey = !!process.env.API_KEY;
+      const hasStudioKey = (window as any).aistudio ? await (window as any).aistudio.hasSelectedApiKey() : false;
+      setIsAiConnected(hasEnvKey || hasStudioKey);
+    };
+    checkConnection();
+  }, []);
+
+  const handleConnectAi = async () => {
+    if ((window as any).aistudio) {
+      await (window as any).aistudio.openSelectKey();
+      // Assume success as per instructions to avoid race conditions
+      setIsAiConnected(true);
+    }
+  };
 
   const totalUploadedPoints = useMemo(() => {
     return uploadedForecasts.reduce((acc, f) => acc + f.forecast.length, 0);
@@ -115,6 +137,12 @@ const App: React.FC = () => {
 
   const handleRunForecast = async () => {
     if (!filters.partNumber || !filters.vendor || !filters.country) return;
+    
+    if (!isAiConnected) {
+      await handleConnectAi();
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setActiveTab('trends');
@@ -126,7 +154,12 @@ const App: React.FC = () => {
       });
       setForecast(result);
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred during forecasting.");
+      if (err.message.includes("Requested entity was not found")) {
+        setIsAiConnected(false);
+        handleConnectAi();
+      } else {
+        setError(err.message || "An unexpected error occurred during forecasting.");
+      }
     } finally {
       setLoading(false);
     }
@@ -135,6 +168,11 @@ const App: React.FC = () => {
   const handleGenerateAllForecasts = async () => {
     if (activeData.length === 0) return;
     
+    if (!isAiConnected) {
+      await handleConnectAi();
+      return;
+    }
+
     const combinations: FilterState[] = [];
     const parts = Array.from(new Set(activeData.map(d => d.partNumber)));
     parts.forEach(p => {
@@ -170,7 +208,12 @@ const App: React.FC = () => {
         setForecast(first);
       }
     } catch (err: any) {
-      setError(err.message || "Bulk processing encountered a critical failure.");
+      if (err.message.includes("Requested entity was not found")) {
+        setIsAiConnected(false);
+        handleConnectAi();
+      } else {
+        setError(err.message || "Bulk processing encountered a critical failure.");
+      }
     } finally {
       setBulkLoading(false);
       setBulkProgress(0);
@@ -231,6 +274,11 @@ const App: React.FC = () => {
       return;
     }
     
+    if (!isAiConnected) {
+      await handleConnectAi();
+      return;
+    }
+
     const activeForecasts = forecastSource === 'system' ? allForecasts : uploadedForecasts;
     if (activeForecasts.length === 0) {
       setError(`Baseline Missing: Please ensure you have ${forecastSource === 'system' ? 'system forecasts' : 'uploaded forecast data'} available.`);
@@ -243,7 +291,12 @@ const App: React.FC = () => {
       const results = await getBenchmarkAnalysis(proposedRates, activeForecasts, confidenceLevel);
       setBenchmarks(results);
     } catch (err: any) {
-      setError(err.message || "Benchmark analysis failed due to an AI engine error.");
+      if (err.message.includes("Requested entity was not found")) {
+        setIsAiConnected(false);
+        handleConnectAi();
+      } else {
+        setError(err.message || "Benchmark analysis failed due to an AI engine error.");
+      }
     } finally {
       setLoading(false);
     }
@@ -514,13 +567,21 @@ const App: React.FC = () => {
         <div className="flex items-center gap-4">
            {isCleansed && <div className="px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full text-[10px] font-bold text-emerald-700 flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3"/> {outlierCount} Outliers Cleansed</div>}
            <div className="h-8 w-px bg-slate-100" />
+           
+           {/* API Status Indicator */}
            <div className="flex items-center gap-3">
              <div className="flex flex-col items-end">
-               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Repository</span>
-               <span className="text-xs font-black text-indigo-600">{allForecasts.length} Active Models</span>
+               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AI Connection</span>
+               <button 
+                 onClick={handleConnectAi}
+                 className={`text-[10px] font-black uppercase flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all ${isAiConnected ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100 hover:bg-rose-100'}`}
+               >
+                 {isAiConnected ? <ShieldCheck className="w-3 h-3" /> : <Key className="w-3 h-3 animate-pulse" />}
+                 {isAiConnected ? 'Authenticated' : 'Connect API'}
+               </button>
              </div>
              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 rounded-xl text-white text-xs font-bold">
-               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> AI Agent Ready
+               <div className={`w-1.5 h-1.5 rounded-full ${isAiConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} /> Agent {isAiConnected ? 'Ready' : 'Paused'}
              </div>
            </div>
         </div>
